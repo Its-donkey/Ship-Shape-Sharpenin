@@ -1,0 +1,27 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "editor.inlineSuggest.enabled": false,
+    "editor.suggest.showInlineDetails": false,
+    "editor.suggest.showWords": false,
+    "editor.quickSuggestions": {
+      "other": "off",
+      "comments": "off",
+      "strings": "off"
+    },
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "github.copilot.enable": {
+      "*": false
+    },
+    "chatgpt.enable": true,
+    "chatgpt.inlineCompletion.enable": true,
+    "chatgpt.explain.enable": true,
+    "chatgpt.openOnStartup": true,
+    "CodeGPT.apiKey": "OpenAI"
+  }
+}

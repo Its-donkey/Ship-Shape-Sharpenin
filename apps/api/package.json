@@ -1,0 +1,35 @@
+{
+  "name": "@shipshape/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon --signal SIGTERM --watch src --ext ts,js,json --exec \"ts-node --project tsconfig.json src/server.ts\"",
+    "dev:debug": "DEBUG=ts-node* nodemon --signal SIGTERM --watch src --ext ts,js,json --exec \"ts-node --project tsconfig.json src/server.ts\"",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "test": "node -e \"console.log('api smoke ok')\""
+  },
+  "dependencies": {
+    "@shipshape/validation": "file:../../packages/validation",
+    "archiver": "^7.0.1",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.2.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "multer": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.3.1",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}

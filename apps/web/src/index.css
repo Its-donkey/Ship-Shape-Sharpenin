@@ -1,0 +1,35 @@
+/* Tailwind v4: import everything via a single entry */
+@import "tailwindcss";
+
+/* Define tokens BEFORE utilities are generated */
+@theme {
+  /* Core palette used in your components */
+  --color-paper: #FCFCFC;     /* enables bg-paper */
+  --color-graphite: #2F2F2F;  /* enables text-graphite */
+
+  /* Optional: additional colors you referenced elsewhere */
+  --color-ink: #6B7280;
+  --color-iron: #2E3338;
+
+  /* Steel scale for borders/dividers if you use them */
+  --color-steel-100: #EEF2F5;
+  --color-steel-200: #DCE4EA;
+  --color-steel-300: #C7D1DA;
+  --color-steel-400: #B9C2CA;
+  --color-steel-500: #9EABB6;
+
+  /* Brand accent */
+  --color-accent: #F6031D;
+}
+
+/* App base styles */
+:root { color-scheme: light; }
+html, body, #root { height: 100%; }
+
+/* Now @apply can safely use token-backed utilities */
+body {
+  @apply bg-paper text-graphite antialiased;
+}
+
+/* Smooth anchor scrolling offset for fixed header */
+[id] { scroll-margin-top: 5rem; }

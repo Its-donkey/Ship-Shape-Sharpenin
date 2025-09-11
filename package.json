@@ -1,0 +1,24 @@
+{
+  "name": "ship-shape-sharpening",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently -n web,api,validation -c auto \"npm:dev:web\" \"npm:dev:api\" \"npm -w @shipshape/validation run dev\"",
+    "dev:web": "npm --workspace @shipshape/web run dev",
+    "dev:api": "npm --workspace @shipshape/api run dev",
+    "dev:debug": "concurrently -n web,api,validation -c auto \"npm:dev:debug:web\" \"npm:dev:debug:api\" \"npm -w @shipshape/validation run dev\"",
+    "dev:debug:web": "npm --workspace @shipshape/web run dev:debug",
+    "dev:debug:api": "npm --workspace @shipshape/api run dev:debug",
+    "build": "npm run build -ws",
+    "lint": "eslint .",
+    "test": "npm -w @shipshape/api run test && npm -w @shipshape/web run test"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.3",
+    "@types/better-sqlite3": "^7.6.13",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.35.0",
+    "typescript": "^5.9.2"
+  },
+  "packageManager": "npm@11.6.0"
+}

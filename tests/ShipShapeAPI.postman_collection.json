@@ -1,0 +1,92 @@
+{
+  "info": {
+    "name": "Ship Shape API",
+    "_postman_id": "d2f5b2a8-4a8e-41f3-9a11-shipshape-demo",
+    "description": "Postman collection for testing Ship Shape API (customers + auth)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register Customer",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo@example.com\",\n  \"password\": \"password123\",\n  \"name\": \"Demo User\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5001/api/customers/register",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5001",
+          "path": ["api", "customers", "register"]
+        }
+      }
+    },
+    {
+      "name": "Login Customer",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5001/api/customers/login",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5001",
+          "path": ["api", "customers", "login"]
+        }
+      }
+    },
+    {
+      "name": "Get Current Customer (Me)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5001/api/customers/me",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5001",
+          "path": ["api", "customers", "me"]
+        }
+      }
+    },
+    {
+      "name": "Logout Customer",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5001/api/customers/logout",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5001",
+          "path": ["api", "customers", "logout"]
+        }
+      }
+    },
+    {
+      "name": "Dev Login (no password)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 1\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5001/api/auth/devlogin",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5001",
+          "path": ["api", "auth", "devlogin"]
+        }
+      }
+    }
+  ]
+}
