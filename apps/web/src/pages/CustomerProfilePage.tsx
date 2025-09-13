@@ -1,5 +1,8 @@
+//apps/web/src/pages/CustomerProfilePage.tsx
+
 // /src/pages/CustomerProfilePage.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { abnIsValid, formatAbn, normalizeAbn } from "@shipshape/validation";
 import { useAuth } from "../auth/AuthContext";
 
 type ProfileForm = {
@@ -27,9 +30,64 @@ export default function CustomerProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [abrLoading, setAbrLoading] = useState(false);
+  const [abrError, setAbrError] = useState<string | null>(null);
+  const lastAbnRef = useRef<string | null>(null);
+  const [lockedFromAbr, setLockedFromAbr] = useState<{ companyName: boolean; tradingName: boolean }>({
+    companyName: false,
+    tradingName: false,
+  });
 
   const inputCls =
     "mt-2 w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-accent";
+
+  // Derived ABN state for inline UI feedback
+  const abnDigits = normalizeAbn(form.abn ?? "").length;
+  const abnInsufficient = abnDigits > 0 && abnDigits < 11; // show hint until full 11 digits
+  const abnValid = !!form.abn && abnIsValid(form.abn);
+
+  // On valid ABN, fetch ABR details once per ABN and populate fields
+  useEffect(() => {
+    const digits = normalizeAbn(form.abn ?? "");
+    if (!abnValid) return;
+    if (!/^\d{11}$/.test(digits)) return;
+    if (lastAbnRef.current === digits) return;
+
+    let cancelled = false;
+    setAbrError(null);
+    setAbrLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/abr/abn/${digits}`, { credentials: "include" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) throw new Error(data?.message || "ABR lookup failed");
+        if (cancelled) return;
+        lastAbnRef.current = digits;
+
+        const entityName: string | undefined = data?.entityName || undefined;
+        const firstBusinessName: string | undefined = Array.isArray(data?.businessNames)
+          ? data.businessNames[0]
+          : undefined;
+        setForm((f) => ({
+          ...f,
+          companyName: entityName ?? f.companyName,
+          tradingName: firstBusinessName ?? f.tradingName,
+        }));
+        setLockedFromAbr((l) => ({
+          companyName: l.companyName || !!entityName,
+          tradingName: l.tradingName || !!firstBusinessName,
+        }));
+      } catch (e: any) {
+        if (!cancelled) setAbrError(e?.message || "ABR lookup failed");
+      } finally {
+        if (!cancelled) setAbrLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.abn, abnValid]);
 
   // Seed form from auth customer on first load or when auth changes
   useEffect(() => {
@@ -38,7 +96,7 @@ export default function CustomerProfilePage() {
       name: customer.name,
       companyName: customer.company_name,
       tradingName: customer.trading_name,
-      abn: customer.abn,
+      abn: customer.abn ? formatAbn(customer.abn) : null,
       deliveryAddress: customer.delivery_addr,
       billingAddress: customer.billing_addr,
       phone: customer.phone,
@@ -48,7 +106,29 @@ export default function CustomerProfilePage() {
   // Keep billing in sync if checkbox is on
   function update<K extends keyof ProfileForm>(key: K) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const value = e.target.value;
+      let value = e.target.value;
+      if (key === "abn") {
+        const formatted = formatAbn(value);
+        const newDigits = normalizeAbn(formatted);
+        const prevDigits = normalizeAbn(form.abn ?? "");
+        if (newDigits !== prevDigits) {
+          // ABN changed: clear ABR-derived fields and unlock editing
+          lastAbnRef.current = null;
+          setLockedFromAbr({ companyName: false, tradingName: false });
+          setAbrError(null);
+          setForm((f) => ({
+            ...f,
+            abn: formatted,
+            companyName: "",
+            tradingName: "",
+          }));
+          return;
+        }
+        value = formatted;
+      }
+      if ((key === "companyName" && lockedFromAbr.companyName) || (key === "tradingName" && lockedFromAbr.tradingName)) {
+        return;
+      }
       setForm((f) => ({
         ...f,
         [key]: value,
@@ -58,8 +138,7 @@ export default function CustomerProfilePage() {
   }
 
   function validate(): string | null {
-    const abnDigits = (form.abn ?? "").replace(/\s+/g, "");
-    if (form.abn && !/^\d{11}$/.test(abnDigits)) return "ABN should be 11 digits.";
+    if (form.abn && !abnIsValid(form.abn)) return "Please enter a valid ABN (11 digits).";
     if (form.phone && !/^[\d\s()+-]{6,}$/.test(form.phone)) return "Please provide a valid phone number.";
     return null;
   }
@@ -85,7 +164,7 @@ export default function CustomerProfilePage() {
           name: form.name,
           companyName: form.companyName,
           tradingName: form.tradingName,
-          abn: form.abn,
+          abn: form.abn ? normalizeAbn(form.abn) : "",
           deliveryAddress: form.deliveryAddress,
           billingAddress: form.billingAddress,
           phone: form.phone,
@@ -139,26 +218,56 @@ export default function CustomerProfilePage() {
             <input id="name" type="text" className={inputCls} value={form.name ?? ""} onChange={update("name")} />
           </div>
 
+          {/* Phone above Email */}
+          <div>
+            <label htmlFor="phone" className="block text-sm font-semibold">Phone</label>
+            <input id="phone" type="tel" autoComplete="tel" className={inputCls} value={form.phone ?? ""} onChange={update("phone")} />
+          </div>
+
           <div>
             <label className="block text-sm font-semibold">Email</label>
             <input className={inputCls} value={customer.email} disabled />
             <p className="mt-1 text-xs text-zinc-500">Email can’t be changed here.</p>
           </div>
 
+          {/* ABN just under Email */}
+          <div>
+            <label htmlFor="abn" className="block text-sm font-semibold">ABN</label>
+            <input
+              id="abn"
+              inputMode="numeric"
+              maxLength={14} // XX XXX XXX XXX
+              className={`${inputCls} ${abnValid ? "border-emerald-500 focus:border-emerald-500 bg-emerald-50" : ""}`}
+              placeholder="11 digits"
+              value={form.abn ?? ""}
+              onChange={update("abn")}
+            />
+            {abnInsufficient && (
+              <p className="mt-1 text-xs text-red-600">Insufficient digits</p>
+            )}
+            {abrLoading && !abnInsufficient && (
+              <p className="mt-1 text-xs text-zinc-500">Looking up ABR…</p>
+            )}
+            {!!abrError && (
+              <p className="mt-1 text-xs text-red-600">{abrError}</p>
+            )}
+          </div>
+
           {/* Company */}
           <div>
             <label htmlFor="companyName" className="block text-sm font-semibold">Company Name</label>
-            <input id="companyName" type="text" className={inputCls} value={form.companyName ?? ""} onChange={update("companyName")} />
+            <input id="companyName" type="text" className={inputCls} value={form.companyName ?? ""} onChange={update("companyName")} disabled={lockedFromAbr.companyName} />
+            {lockedFromAbr.companyName && (
+              <p className="mt-1 text-xs text-zinc-500">Auto-filled from ABR</p>
+            )}
           </div>
 
           <div>
             <label htmlFor="tradingName" className="block text-sm font-semibold">Trading Name</label>
-            <input id="tradingName" type="text" className={inputCls} value={form.tradingName ?? ""} onChange={update("tradingName")} />
-          </div>
-
-          <div>
-            <label htmlFor="abn" className="block text-sm font-semibold">ABN</label>
-            <input id="abn" inputMode="numeric" className={inputCls} placeholder="11 digits" value={form.abn ?? ""} onChange={update("abn")} />
+            <input id="tradingName" type="text" className={inputCls} value={form.tradingName ?? ""} onChange={update("tradingName")} disabled={lockedFromAbr.tradingName} />
+            {lockedFromAbr.tradingName && (
+              <p className="mt-1 text-xs text-zinc-500">Auto-filled from ABR</p>
+            )}
           </div>
 
           {/* Addresses */}
@@ -186,11 +295,7 @@ export default function CustomerProfilePage() {
             <textarea id="billingAddress" rows={2} className={inputCls} value={form.billingAddress ?? ""} onChange={update("billingAddress")} />
           </div>
 
-          {/* Phone */}
-          <div>
-            <label htmlFor="phone" className="block text-sm font-semibold">Phone</label>
-            <input id="phone" type="tel" autoComplete="tel" className={inputCls} value={form.phone ?? ""} onChange={update("phone")} />
-          </div>
+          {/* Phone moved above Email */}
 
           <div className="pt-2">
             <button

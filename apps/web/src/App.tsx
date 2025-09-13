@@ -1,3 +1,5 @@
+//apps/web/src/App.tsx
+
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, useEffect, Suspense } from "react";
 import Header from "./components/Header";
@@ -15,7 +17,7 @@ const CustomerRegisterPage = lazy(() => import("./pages/CustomerRegisterPage"));
 const CustomerForgotPage = lazy(() => import("./pages/CustomerForgotPage"));
 const CustomerProfilePage = lazy(() => import("./pages/CustomerProfilePage"));
 const RequireAuth = lazy(() => import("./components/RequireAuth"));
-const MGISPricingPage = lazy(() => import("./pages/MGISPricingPage"));
+const RequireAdmin = lazy(() => import("./components/RequireAdmin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 /** Optional: scroll to top on route change (basic) */
@@ -23,7 +25,7 @@ function ScrollToTop() {
   useEffect(() => {
     // default behavior: let hash links scroll to anchors; otherwise, top
     if (!location.hash)
-      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+      window.scrollTo({ top: 0, behavior: "auto" });
   });
   return null;
 }
@@ -54,8 +56,14 @@ export default function App() {
               element={<CustomerRegisterPage />}
             />
             <Route path="/customer/forgot" element={<CustomerForgotPage />} />
-            <Route path="/mgis-pricing" element={<MGISPricingPage />} />
-            <Route path="/admin" element={<AdminPage />} />
+            <Route
+              path="/admin"
+              element={
+                <RequireAdmin>
+                  <AdminPage />
+                </RequireAdmin>
+              }
+            />
 
             {/* Customer private */}
             <Route

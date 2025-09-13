@@ -21,6 +21,7 @@ type Customer = {
   delivery_addr: string | null;
   billing_addr: string | null;
   phone: string | null;
+  is_admin?: boolean; // true if admin
 };
 
 type AuthState = {

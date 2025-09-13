@@ -1,3 +1,5 @@
+#scripts/clean-project.sh
+
 #!/usr/bin/env zsh
 # Ship Shape Sharpening — project cleanup helper
 # Usage:

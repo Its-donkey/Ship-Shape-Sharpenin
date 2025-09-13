@@ -1,3 +1,5 @@
+//scripts/test-proxy.mjs
+
 // Simple Vite proxy smoke test with retries and colored output.
 // Usage:
 //   npm run dev   # start dev servers

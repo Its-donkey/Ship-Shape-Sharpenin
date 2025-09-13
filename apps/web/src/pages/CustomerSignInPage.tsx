@@ -1,3 +1,5 @@
+//apps/web/src/pages/CustomerSignInPage.tsx
+
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -24,6 +26,7 @@ export default function CustomerSignInPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { setCustomer } = useAuth();
+  const passwordRequired = !import.meta.env.DEV; // in dev, allow empty passwords
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -33,8 +36,8 @@ export default function CustomerSignInPage() {
     e.preventDefault();
     setError(null);
 
-    if (!form.email.trim() || !form.password.trim()) {
-      setError("Please enter your email and password.");
+    if (!form.email.trim()) {
+      setError("Please enter your email address.");
       return;
     }
 
@@ -116,7 +119,7 @@ export default function CustomerSignInPage() {
               onChange={(e) => update("password", e.target.value)}
               className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-0 focus:border-zinc-400"
               placeholder="••••••••"
-              required
+              required={passwordRequired}
             />
           </div>
 

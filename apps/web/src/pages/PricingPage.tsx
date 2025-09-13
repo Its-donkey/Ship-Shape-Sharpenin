@@ -1,7 +1,9 @@
+//apps/web/src/pages/PricingPage.tsx
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-type ItemRow = { productName: string; description: string; price: string };
+type ItemRow = { productName: string; description: string; price: string; specialPrice?: string };
 
 const PricingPage = () => {
   const [items, setItems] = useState<ItemRow[]>([]);
@@ -12,7 +14,7 @@ const PricingPage = () => {
     const fetchItems = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/items/compact");
+        const response = await fetch("/api/items/compact", { credentials: 'include' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data: ItemRow[] = await response.json();
         setItems(data);
@@ -41,6 +43,9 @@ const PricingPage = () => {
                 <th className="p-2 border">Product</th>
                 <th className="p-2 border">Description</th>
                 <th className="p-2 border">Price</th>
+                {items.some(i => i.specialPrice) && (
+                  <th className="p-2 border">Special Price</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -49,6 +54,9 @@ const PricingPage = () => {
                   <td className="p-2 border">{item.productName}</td>
                   <td className="p-2 border">{item.description}</td>
                   <td className="p-2 border">{item.price}</td>
+                  {items.some(i => i.specialPrice) && (
+                    <td className="p-2 border">{item.specialPrice ?? '—'}</td>
+                  )}
                 </tr>
               ))}
             </tbody>

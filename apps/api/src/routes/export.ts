@@ -3,6 +3,7 @@ import { Router, Request, Response } from "express";
 import path from "node:path";
 import fs from "node:fs";
 import archiver, { ArchiverError } from "archiver";
+import { requireAdmin } from "./auth";
 
 const router = Router();
 
@@ -53,7 +54,7 @@ function sydneyStamp(): string {
  * GET /api/export/zip
  * Streams a zip containing only the useful files for review (source, configs, env scaffolding).
  */
-router.get("/zip", async (_req: Request, res: Response): Promise<void> => {
+router.get("/zip", requireAdmin, async (_req: Request, res: Response): Promise<void> => {
   try {
     const repoRoot: string = findRepoRoot(path.resolve(__dirname, "..", "..", "..", "..")); // apps/api/src -> apps/api
     const filename: string = `Ship-Shape-Review-${sydneyStamp()}.zip`;

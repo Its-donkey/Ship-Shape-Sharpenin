@@ -1,3 +1,5 @@
+//packages/validation/src/common.ts
+
 /** Return `null` when valid, or a human-readable error message when invalid. */
 export type Validator<T = string> = (value: T) => string | null;
 
@@ -29,3 +31,8 @@ export const maxLength =
   (n: number, label = "This field"): Validator<string> =>
   (v) =>
     (v ?? "").length <= n ? null : `${label} must be at most ${n} characters.`;
+
+/** Boolean helper: true if string has any non-whitespace content */
+export function isNonEmpty(v: string): boolean {
+  return (v ?? "").toString().trim().length > 0;
+}

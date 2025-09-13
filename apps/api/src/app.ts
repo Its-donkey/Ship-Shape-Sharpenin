@@ -1,4 +1,5 @@
 // apps/api/src/app.ts
+
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -6,9 +7,12 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth";
 import customerRoutes from "./routes/customers";
 import itemsRoutes from "./routes/items";
+import tldsRoutes from "./routes/tlds";
+import abrRoutes from "./routes/abr";
+import businessesRoutes from "./routes/businesses";
 import exportRouter from "./routes/export";
 
-import "./db/client"; // side-effect: init DB/migrations
+import "./db/database"; // side-effect: init DB/migrations
 
 const app = express();
 
@@ -43,5 +47,8 @@ app.use("/api", authRoutes);
 app.use("/api", customerRoutes);
 app.use("/api/export", exportRouter);
 app.use("/api/items", itemsRoutes);
+app.use("/api/tlds", tldsRoutes);
+app.use("/api/abr", abrRoutes);
+app.use("/api", businessesRoutes);
 
 export default app;

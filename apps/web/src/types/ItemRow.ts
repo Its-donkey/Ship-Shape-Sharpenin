@@ -1,3 +1,5 @@
+//apps/web/src/types/ItemRow.ts
+
 // src/types/ItemRow.ts
 export interface ItemRow {
   sku: string;

@@ -1,9 +1,12 @@
+//apps/web/src/pages/CustomerDashboardPage.tsx
+
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchMe } from "../lib/me";
 
 export default function CustomerDashboardPage() {
-  const [me, setMe] = useState<{ id: number; email: string; name?: string } | null>(null);
+  const [me, setMe] = useState<{ id: number; email: string; name?: string; is_admin?: boolean } | null>(null);
+  const [showAdminPopup, setShowAdminPopup] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -13,12 +16,39 @@ export default function CustomerDashboardPage() {
         navigate("/customer/sign-in");
         return;
       }
-      setMe(who);
+      setMe(who as any);
+      // Show admin popup on login
+      if ((who as any)?.is_admin) {
+        setShowAdminPopup(true);
+      }
     })();
   }, [navigate]);
 
   return (
     <>
+      {showAdminPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-2">Admin</h2>
+            <p className="text-sm text-zinc-700">Welcome back — you have admin access.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <a
+                href="/admin"
+                className="rounded-full px-4 py-2 text-xs font-bold text-white bg-accent hover:brightness-110"
+                onClick={() => setShowAdminPopup(false)}
+              >
+                Go to Admin
+              </a>
+              <button
+                className="rounded-full px-4 py-2 text-xs font-bold text-zinc-800 bg-zinc-200 hover:brightness-110"
+                onClick={() => setShowAdminPopup(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <main className="mx-auto max-w-5xl px-4 py-10">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-extrabold tracking-tight">

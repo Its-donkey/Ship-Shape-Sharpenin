@@ -1,3 +1,5 @@
+//apps/web/src/lib/me.ts
+
 export async function fetchMe() {
   const res = await fetch("/api/customers/me", { credentials: "include" });
   if (!res.ok) return null;

@@ -1,3 +1,5 @@
+//apps/web/src/components/Header.tsx
+
 import {
   Link,
   NavLink,
@@ -64,7 +66,7 @@ const Header: React.FC = () => {
 
   async function handleSignOut() {
     try {
-      await fetch("/api/customers/logout", {
+      await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
@@ -120,6 +122,7 @@ const Header: React.FC = () => {
           <NavLink to="/pricing" className={navLinkClass}>
             Pricing
           </NavLink>
+          {/* Trade pricing removed */}
 
           {/* Customer / User */}
           {!customer ? (
@@ -192,9 +195,11 @@ const Header: React.FC = () => {
             </div>
           )}
 
-          <NavLink to="/admin" className={navLinkClass}>
-            Admin
-          </NavLink>
+          {customer?.is_admin ? (
+            <NavLink to="/admin" className={navLinkClass}>
+              Admin
+            </NavLink>
+          ) : null}
 
           {/* Book Now */}
           <a

@@ -1,3 +1,5 @@
+//packages/validation/src/email.ts
+
 import type { Validator } from "./common";
 
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;

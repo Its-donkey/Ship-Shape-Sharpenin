@@ -1,3 +1,5 @@
+//apps/web/src/components/RequireAuth.tsx
+
 // File: src/components/RequireAuth.tsx
 import { Navigate, useLocation } from "react-router-dom";
 import { type ReactNode } from "react";           // 👈 type-only import

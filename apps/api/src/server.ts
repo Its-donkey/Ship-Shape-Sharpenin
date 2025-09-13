@@ -1,12 +1,16 @@
 // apps/api/src/server.ts
+import "dotenv/config";
 import { createServer } from "node:http";
 import app from "./app";
+import { startTldCron } from "./jobs/tldCron";
 
 const PORT = Number(process.env.API_PORT || process.env.PORT || 5001);
 const server = createServer(app);
 
 server.listen(PORT, () => {
   console.log(`[api] listening on http://localhost:${PORT}`);
+  // Start background jobs only when server is running
+  startTldCron();
 });
 
 // Graceful shutdown

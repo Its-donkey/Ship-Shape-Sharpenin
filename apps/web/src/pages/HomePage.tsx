@@ -1,3 +1,5 @@
+//apps/web/src/pages/HomePage.tsx
+
 import { motion } from "framer-motion";
 import {
   GiKitchenKnives,

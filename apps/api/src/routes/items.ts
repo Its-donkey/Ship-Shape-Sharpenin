@@ -1,3 +1,5 @@
+//apps/api/src/routes/items.ts
+
 // server/routes/items.ts
 import { Router } from "express";
 import multer from "multer";
@@ -10,11 +12,15 @@ import db, {
   valuesFromRowFlexible,
   stmtLogPriceUpload,
   sydneyNowSql,
-} from "../db/client";
+} from "../db/database";
 import { TextDecoder } from "util";
+import { requireAdmin } from "./auth";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 // ---------- decode helpers (UTF-8 / UTF-16 / BOM safe) ----------
 function decodeBufferSmart(buf: Buffer): string {
@@ -174,6 +180,29 @@ function resolveDataDirs() {
   return { baseDir, dataDir, pricelistsDir };
 }
 
+// ---------- Import rules (JSON file in data dir) ----------------------------
+type ImportRules = { itemNumberPrefixes?: string[] };
+function rulesPath(): string {
+  const { dataDir } = resolveDataDirs();
+  return path.join(dataDir, "import-rules.json");
+}
+function loadImportRules(): ImportRules {
+  try {
+    const p = rulesPath();
+    if (!fs.existsSync(p)) return { itemNumberPrefixes: [] };
+    const raw = fs.readFileSync(p, "utf8");
+    const json = JSON.parse(raw);
+    const arr = Array.isArray(json?.itemNumberPrefixes) ? json.itemNumberPrefixes : [];
+    return { itemNumberPrefixes: arr.filter((s: any) => typeof s === "string").map((s: string) => s.trim()).filter(Boolean) };
+  } catch {
+    return { itemNumberPrefixes: [] };
+  }
+}
+function saveImportRules(rules: ImportRules): void {
+  const p = rulesPath();
+  fs.writeFileSync(p, JSON.stringify({ itemNumberPrefixes: rules.itemNumberPrefixes ?? [] }, null, 2), "utf8");
+}
+
 // YYYY-MM-DD-hhmm in Australia/Sydney for filenames
 function tsForFilename(): string {
   const now = new Date();
@@ -193,12 +222,22 @@ function tsForFilename(): string {
 }
 
 // ---------- routes ----------
-router.post("/upload", upload.single("file"), (req, res) => {
+router.post("/upload", requireAdmin, upload.single("file"), (req, res) => {
   try {
     if (!req.file)
       return res.status(400).json({ ok: false, error: "No file uploaded" });
 
     const { originalname, size, buffer, mimetype } = req.file;
+    const allowed = [
+      "text/plain",
+      "text/csv",
+      "application/json",
+      "text/tab-separated-values",
+    ];
+    if (mimetype && !allowed.includes(mimetype)) {
+      // allow unknowns; warn but continue
+      console.warn(`[items.upload] unexpected mimetype: ${mimetype}`);
+    }
     const decoded = decodeBufferSmart(buffer);
     const firstLine = firstNonEmptyLine(decoded);
 
@@ -212,12 +251,20 @@ router.post("/upload", upload.single("file"), (req, res) => {
       });
     }
 
+    // Load dynamic import rules
+    const rules = loadImportRules();
+    const prefixes = (rules.itemNumberPrefixes ?? []).map((s) => s.toUpperCase());
+
     // Upsert into DB (valuesFromRowFlexible handles aliasing to ITEM_COLS)
     let upserted = 0;
     const tx = db.transaction((all: Array<Record<string, string>>) => {
       for (const obj of all) {
         const vals = valuesFromRowFlexible(obj);
-        if (!vals[0]) continue; // Item Number required
+        const itemNumber = String(vals[0] || "").trim();
+        if (!itemNumber) continue; // Item Number required
+        // Apply skip-by-prefix rules
+        const upper = itemNumber.toUpperCase();
+        if (prefixes.some((p) => p && upper.startsWith(p))) continue;
         stmtUpsertItem.run(vals);
         upserted++;
       }
@@ -268,7 +315,7 @@ router.post("/upload", upload.single("file"), (req, res) => {
   }
 });
 
-router.post("/clear", (_req, res) => {
+router.post("/clear", requireAdmin, (_req, res) => {
   try {
     const info = db.prepare(`DELETE FROM items`).run();
     const deleted = typeof info.changes === "number" ? info.changes : 0;
@@ -298,8 +345,143 @@ router.post("/clear", (_req, res) => {
   }
 });
 
+// Read current import rules
+router.get("/rules", (_req, res) => {
+  try {
+    const rules = loadImportRules();
+    res.json({ ok: true, rules });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, message: e?.message || "Failed to read rules" });
+  }
+});
+
+// Save import rules
+router.post("/rules", requireAdmin, (req, res) => {
+  try {
+    const body = (req.body || {}) as ImportRules;
+    const arr = Array.isArray(body.itemNumberPrefixes) ? body.itemNumberPrefixes : [];
+    const clean = arr.filter((s) => typeof s === "string").map((s) => s.trim()).filter(Boolean);
+    saveImportRules({ itemNumberPrefixes: clean });
+    res.json({ ok: true, rules: { itemNumberPrefixes: clean } });
+  } catch (e: any) {
+    res.status(500).json({ ok: false, message: e?.message || "Failed to save rules" });
+  }
+});
+
 router.get("/", (_req, res) => res.json(stmtGetAllItems.all()));
-router.get("/compact", (_req, res) => res.json(stmtGetCompact.all()));
+router.get("/compact", (req, res) => {
+  try {
+    // Load base rows
+    const rows = stmtGetCompact.all() as Array<{
+      itemNumber: string;
+      productName: string;
+      description: string;
+      price: string; // e.g., "$45.00"
+    }>;
+
+    // Helper: parse price string like "$1,234.56" -> cents number
+    function toCents(price: string): number | null {
+      if (!price) return null;
+      const cleaned = String(price).replace(/[^0-9.,-]/g, "").replace(/,/g, "");
+      if (!cleaned) return null;
+      const n = Number(cleaned);
+      if (!Number.isFinite(n)) return null;
+      return Math.max(0, Math.round(n * 100));
+    }
+
+    // Helper: format cents to $X.XX
+    function formatAud(cents: number): string {
+      const val = Math.max(0, Math.round(cents)) / 100;
+      return `$${val.toFixed(2)}`;
+    }
+
+    // Determine if current session belongs to THE TRUSTEE FOR PSS FUND (case-insensitive)
+    let discountPct = 0;
+    try {
+      const sid = (req as any).cookies?.sid;
+      // Lazy import to avoid circulars
+      const { SESSIONS } = require("./auth");
+      const customerId = sid ? SESSIONS.get(sid) : null;
+      if (customerId) {
+        // Fetch customer + optional linked business to check names
+        const row = db
+          .prepare(
+            `SELECT
+               '' AS company_name,
+               '' AS trading_name,
+               LOWER(COALESCE(b.entity_name, ''))   AS entity_name,
+               LOWER(COALESCE(b.business_name, '')) AS business_name
+             FROM customers c
+             LEFT JOIN business_customer b ON b.id = c.business_id
+             WHERE c.id = ?`
+          )
+          .get(customerId) as
+          | {
+              company_name?: string;
+              trading_name?: string;
+              entity_name?: string;
+              business_name?: string;
+            }
+          | undefined;
+
+        const target = "the trustee for pss fund";
+        if (row) {
+          const fields = [row.entity_name, row.business_name];
+          if (fields.some((v) => (v ?? "") === target)) {
+            discountPct = 0.15;
+          }
+        }
+      }
+    } catch (e) {
+      // Non-fatal: fall back to no discount
+      console.warn("[items.compact] discount check failed:", (e as Error)?.message);
+    }
+
+    // Attach business special pricing if signed-in and linked to a business
+    let bizOverrides: Map<string, number> | null = null; // itemNumber -> price_cents
+    try {
+      const sid = (req as any).cookies?.sid;
+      const { SESSIONS } = require("./auth");
+      const customerId = sid ? SESSIONS.get(sid) : null;
+      if (customerId) {
+        const b = db
+          .prepare(`SELECT business_id FROM customers WHERE id = ?`)
+          .get(customerId) as { business_id?: number } | undefined;
+        if (b?.business_id) {
+          const list = db
+            .prepare(`SELECT item_number AS itemNumber, price_cents AS priceCents FROM business_pricing WHERE business_id = ?`)
+            .all(b.business_id) as Array<{ itemNumber: string; priceCents: number }>;
+          bizOverrides = new Map(list.map((r) => [r.itemNumber, r.priceCents]));
+        }
+      }
+    } catch (e) {
+      // non-fatal
+      console.warn("[items.compact] special pricing lookup failed:", (e as Error)?.message);
+    }
+
+    if (!discountPct && !bizOverrides) return res.json(rows);
+
+    // Apply discount to price column for display only
+    const discounted = rows.map((r) => {
+      const cents = toCents(r.price);
+      if (cents == null) return r; // leave as-is if unparsable
+      const out: any = { ...r };
+      if (discountPct) {
+        const newCents = Math.max(0, Math.round(cents * (1 - discountPct)));
+        out.price = formatAud(newCents);
+      }
+      if (bizOverrides && bizOverrides.has(r.itemNumber)) {
+        const sp = bizOverrides.get(r.itemNumber)!;
+        out.specialPrice = formatAud(sp);
+      }
+      return out;
+    });
+    return res.json(discounted);
+  } catch (e: any) {
+    console.error("[items.compact] error:", e);
+    return res.status(500).json({ ok: false, message: e?.message || "Failed to load items" });
+  }
+});
 
 router.get("/_count", (_req, res) => {
   const row = db.prepare(`SELECT COUNT(*) AS n FROM items`).get() as {
@@ -310,6 +492,56 @@ router.get("/_count", (_req, res) => {
 router.get("/_sample", (_req, res) => {
   const rows = db.prepare(`SELECT * FROM items LIMIT 3`).all();
   res.json({ ok: true, sample: rows });
+});
+
+// Update a subset of fields for a single item identified by Item Number
+router.post("/update", requireAdmin, (req, res) => {
+  try {
+    const { itemNumber, productName, description, price } = (req.body || {}) as {
+      itemNumber?: string;
+      productName?: string;
+      description?: string;
+      price?: string | number;
+    };
+    const key = String(itemNumber ?? "").trim();
+    if (!key) return res.status(400).json({ ok: false, message: "itemNumber is required" });
+
+    // Allow partial updates using COALESCE to keep existing values when null/undefined
+    const info = db
+      .prepare(
+        `UPDATE items SET
+           "Item Name"     = COALESCE(?, "Item Name"),
+           "Description"   = COALESCE(?, "Description"),
+           "Selling Price" = COALESCE(?, "Selling Price")
+         WHERE "Item Number" = ?`
+      )
+      .run(
+        productName !== undefined && productName !== null ? String(productName) : null,
+        description !== undefined && description !== null ? String(description) : null,
+        price !== undefined && price !== null ? String(price) : null,
+        key
+      );
+
+    if (info.changes === 0) {
+      return res.status(404).json({ ok: false, message: "Item not found" });
+    }
+
+    // Return the updated compact row
+    const row = db
+      .prepare(
+        `SELECT
+           "Item Number"   AS itemNumber,
+           "Item Name"     AS productName,
+           "Description"   AS description,
+           "Selling Price" AS price
+         FROM items WHERE "Item Number" = ?`
+      )
+      .get(key);
+    return res.json({ ok: true, item: row });
+  } catch (e: any) {
+    console.error("[items.update] error:", e);
+    return res.status(500).json({ ok: false, message: e?.message || "Update failed" });
+  }
 });
 
 export default router;

@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "composite": true,
     "outDir": "./dist",
@@ -8,7 +8,8 @@
     "declarationMap": true,
     "emitDeclarationOnly": false,
     "skipLibCheck": true,
-    "noEmit": false
+    "noEmit": false,
+    "types": ["vitest/globals", "node"]
   },
   "include": ["src"]
 }
